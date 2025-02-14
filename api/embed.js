@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const path = require('path');
 
 class EmbedSource {
     constructor(file, sourceType) {
@@ -29,8 +30,9 @@ class EmbedSources {
 
 const handleEmbed = (embedUrl, referrer) => {
     return new Promise((resolve, reject) => {
-        const process = spawn('node', [
-            'rabbit.js',
+        const rabbitPath = path.join(process.cwd(), 'rabbit.js');
+        const childProcess = spawn('node', [
+            rabbitPath,
             `--embed-url=${embedUrl}`,
             `--referrer=${referrer}`
         ]);
@@ -38,15 +40,15 @@ const handleEmbed = (embedUrl, referrer) => {
         let outputData = '';
         let errorData = '';
 
-        process.stdout.on('data', (data) => {
+        childProcess.stdout.on('data', (data) => {
             outputData += data.toString();
         });
 
-        process.stderr.on('data', (data) => {
+        childProcess.stderr.on('data', (data) => {
             errorData += data.toString();
         });
 
-        process.on('close', (code) => {
+        childProcess.on('close', (code) => {
             if (code !== 0) {
                 console.error('Error processing embed:', errorData);
                 reject(new Error(`Process exited with code ${code}`));
