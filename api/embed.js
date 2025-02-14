@@ -30,7 +30,10 @@ class EmbedSources {
 
 const handleEmbed = (embedUrl, referrer) => {
     return new Promise((resolve, reject) => {
-        const rabbitPath = path.join(process.cwd(), 'rabbit.js');
+        // Use __dirname to get the current directory path
+        const rabbitPath = path.join(__dirname, '..', 'rabbit.js');
+        console.log('Rabbit path:', rabbitPath); // Debug log
+        
         const childProcess = spawn('node', [
             rabbitPath,
             `--embed-url=${embedUrl}`,
@@ -46,6 +49,7 @@ const handleEmbed = (embedUrl, referrer) => {
 
         childProcess.stderr.on('data', (data) => {
             errorData += data.toString();
+            console.error('Stderr:', errorData); // Debug log
         });
 
         childProcess.on('close', (code) => {
@@ -68,6 +72,11 @@ const handleEmbed = (embedUrl, referrer) => {
                 console.error('Error parsing embed output:', error);
                 reject(error);
             }
+        });
+
+        childProcess.on('error', (error) => {
+            console.error('Failed to start process:', error);
+            reject(error);
         });
     });
 };
