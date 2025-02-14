@@ -1,0 +1,23 @@
+{
+  "name": "embed-decrypt-server",
+  "version": "1.0.0",
+  "description": "Video embed processing server",
+  "main": "api/embed.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "vercel dev",
+    "deploy": "vercel deploy --prod"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0",
+    "nodemon": "^3.0.2"
+  }
+} 
