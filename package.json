@@ -4,7 +4,7 @@
   "description": "Video embed processing server",
   "main": "api/embed.js",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   },
   "scripts": {
     "start": "node server.js",
@@ -14,7 +14,9 @@
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.2",
+    "debug": "^4.3.4",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "vercel": "^32.0.0",
