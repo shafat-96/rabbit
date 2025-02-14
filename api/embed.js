@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs').promises;
 
 class EmbedSource {
     constructor(file, sourceType) {
@@ -28,60 +29,91 @@ class EmbedSources {
     }
 }
 
-const handleEmbed = (embedUrl, referrer) => {
-    return new Promise((resolve, reject) => {
-        // Use __dirname to get the current directory path
-        const rabbitPath = path.join(__dirname, '..', 'rabbit.js');
-        console.log('Rabbit path:', rabbitPath); // Debug log
-        
-        const childProcess = spawn('node', [
-            rabbitPath,
-            `--embed-url=${embedUrl}`,
-            `--referrer=${referrer}`
-        ]);
+const findRabbitScript = async () => {
+    const possiblePaths = [
+        path.join(__dirname, '..', 'rabbit.js'),
+        path.join(__dirname, 'rabbit.js'),
+        path.join(process.cwd(), 'rabbit.js')
+    ];
 
-        let outputData = '';
-        let errorData = '';
+    for (const p of possiblePaths) {
+        try {
+            await fs.access(p);
+            console.log('Found rabbit.js at:', p);
+            return p;
+        } catch (error) {
+            console.log('Not found at:', p);
+        }
+    }
+    throw new Error('rabbit.js not found in any expected locations');
+};
 
-        childProcess.stdout.on('data', (data) => {
-            outputData += data.toString();
-        });
+const handleEmbed = async (embedUrl, referrer) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const rabbitPath = await findRabbitScript();
+            console.log('Using rabbit.js from:', rabbitPath);
 
-        childProcess.stderr.on('data', (data) => {
-            errorData += data.toString();
-            console.error('Stderr:', errorData); // Debug log
-        });
+            const childProcess = spawn('node', [
+                rabbitPath,
+                `--embed-url=${embedUrl}`,
+                `--referrer=${referrer}`
+            ]);
 
-        childProcess.on('close', (code) => {
-            if (code !== 0) {
-                console.error('Error processing embed:', errorData);
-                reject(new Error(`Process exited with code ${code}`));
-                return;
-            }
+            let outputData = '';
+            let errorData = '';
 
-            try {
-                const parsedOutput = JSON.parse(outputData.trim());
-                const embedSources = new EmbedSources(
-                    parsedOutput.sources.map(s => new EmbedSource(s.file, s.type)),
-                    parsedOutput.tracks.map(t => new Track(t.file, t.label, t.kind, t.default)),
-                    parsedOutput.t,
-                    parsedOutput.server
-                );
-                resolve(embedSources);
-            } catch (error) {
-                console.error('Error parsing embed output:', error);
+            childProcess.stdout.on('data', (data) => {
+                outputData += data.toString();
+                console.log('Stdout:', data.toString());
+            });
+
+            childProcess.stderr.on('data', (data) => {
+                errorData += data.toString();
+                console.error('Stderr:', data.toString());
+            });
+
+            childProcess.on('close', (code) => {
+                console.log('Process exited with code:', code);
+                if (code !== 0) {
+                    console.error('Error processing embed:', errorData);
+                    reject(new Error(`Process exited with code ${code}: ${errorData}`));
+                    return;
+                }
+
+                try {
+                    const parsedOutput = JSON.parse(outputData.trim());
+                    const embedSources = new EmbedSources(
+                        parsedOutput.sources.map(s => new EmbedSource(s.file, s.type)),
+                        parsedOutput.tracks.map(t => new Track(t.file, t.label, t.kind, t.default)),
+                        parsedOutput.t,
+                        parsedOutput.server
+                    );
+                    resolve(embedSources);
+                } catch (error) {
+                    console.error('Error parsing embed output:', error);
+                    reject(error);
+                }
+            });
+
+            childProcess.on('error', (error) => {
+                console.error('Failed to start process:', error);
                 reject(error);
-            }
-        });
-
-        childProcess.on('error', (error) => {
-            console.error('Failed to start process:', error);
+            });
+        } catch (error) {
+            console.error('Error in handleEmbed:', error);
             reject(error);
-        });
+        }
     });
 };
 
 module.exports = async (req, res) => {
+    console.log('Received request:', {
+        method: req.method,
+        query: req.query,
+        headers: req.headers
+    });
+
     // Enable CORS
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -109,6 +141,10 @@ module.exports = async (req, res) => {
         res.json(embedSources);
     } catch (error) {
         console.error('Error processing embed request:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            error: 'Internal server error',
+            message: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 }; 
